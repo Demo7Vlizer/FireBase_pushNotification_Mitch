@@ -1,4 +1,5 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
+import '../services/notification_service.dart';
 import '../main.dart';
 
 class FirebaseApi {
@@ -7,8 +8,18 @@ class FirebaseApi {
 
   // function to initialize notifications
   Future<void> initNotifications() async {
-    // request permission from user (will prompt user)
-    await _firebaseMessaging.requestPermission();
+    await _firebaseMessaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    // Create default notification channel
+    NotificationService.createNotificationChannel(
+      'default_channel',
+      'Default Notifications',
+      'This channel is used for default notifications',
+    );
 
     // fetch the FCM token for this device
     final fCMToken = await _firebaseMessaging.getToken();
@@ -18,27 +29,38 @@ class FirebaseApi {
 
     //initialize further settings  for push notification
     initPushNotifications();
-
   }
 
   // function to handle received messages
-void handleMessage(RemoteMessage? message) {
-  // if the message is null, do nothing
-  if (message == null) return;
+  void handleMessage(RemoteMessage? message) {
+    // if the message is null, do nothing
+    if (message == null) return;
 
-  // navigate to new screen when message is received and user taps notification
-  navigatorKey.currentState?.pushNamed(
-    '/notification_screen',
-    arguments: message,
-  );
-}
+    // navigate to new screen when message is received and user taps notification
+    navigatorKey.currentState?.pushNamed(
+      '/notification_screen',
+      arguments: message,
+    );
+  }
 
 // function to initialize background settings
-Future<void> initPushNotifications() async {
-  // handle notification if the app was terminated and now opened
-  FirebaseMessaging.instance.getInitialMessage().then(handleMessage);
+  Future<void> initPushNotifications() async {
+    // handle notification if the app was terminated and now opened
+    FirebaseMessaging.instance.getInitialMessage().then(handleMessage);
 
-  // attach event listeners for when a notification opens the app
-  FirebaseMessaging.onMessageOpenedApp.listen(handleMessage);
-}
+    // attach event listeners for when a notification opens the app
+    FirebaseMessaging.onMessageOpenedApp.listen(handleMessage);
+
+    // Add this line to listen for messages in the foreground
+    FirebaseMessaging.onMessage.listen((message) {
+      final notification = message.notification;
+      if (notification == null) return;
+
+      NotificationService.showNotification(
+        title: notification.title ?? '',
+        body: notification.body ?? '',
+        payload: message.data.toString(),
+      );
+    });
+  }
 }
